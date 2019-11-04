@@ -1,0 +1,10 @@
+[Unit]
+Description=Bluetooth LE Data Hub
+Wants=bluetooth.target
+After=bluetooth.target
+
+[Service]
+ExecStart=/bin/bash -c "rm -rf /var/lib/bluetooth/*; /home/pi/ble-data-hub/data-hub.py"
+
+[Install]
+WantedBy=multi-user.target

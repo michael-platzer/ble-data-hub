@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>WebSocket demo</title>
+    </head>
+    <body>
+        <div id="devices">
+        </div>
+        <div id="graphs">
+        </div>
+        <script>
+            var ws = new WebSocket("ws://localhost:8080/"),
+                dev_list = document.getElementById("devices"),
+                graph_list = document.getElementById("graphs");
+
+            ws.onmessage = function (event) {
+                var fields = JSON.parse(event.data)
+                switch (fields.type) {
+                    case "new_device":
+                        var addr = fields.dev_addr,
+                            box = document.createElement('div');
+                        box.appendChild(document.createTextNode(addr));
+                        box.onclick = function() { connect_device(addr); };
+                        dev_list.appendChild(box);
+                        break;
+
+                    case "value_update":
+                        update_graph(fields.dev_addr, parseFloat(fields.value) / 100.);
+                        break;
+                }
+            };
+
+            function connect_device(addr) {
+                graph_list.appendChild(init_graph(addr));
+
+                var msg = { type: "conn_device", dev_addr: addr };
+                ws.send(JSON.stringify(msg));
+            }
+
+
+            ////////////////////////////////////////////////////////////////////
+            // GRAPH DRAWING FUNCTIONALITY
+
+            const svg_ns = "http://www.w3.org/2000/svg"; // SVG namespace
+
+            // length of a curve and spacing between curve points (both in x):
+            const curve_len = 2,
+                  curve_step = 0.1;
+
+            // dictionary with the current offset of the curve for each device
+            // (key is the device MAC address):
+            var curve_pos = {};
+
+            function lineTo(x, y) {
+                return "L" + x.toFixed(3) + "," + y.toFixed(3);
+            }
+
+            function init_graph(dev_addr) {
+                curve_pos[dev_addr] = 0.;
+                var svg = document.createElementNS(svg_ns, "svg");
+                svg.setAttribute("style", "width:100%;height:100%;");
+                svg.setAttribute("viewBox", "0 0 2.1 1.1");
+                var static_paths = [
+                        { d: "M 0.02 1.05 L 2.08 1.05", stroke: "gray", stroke_w: ".004", fill: "none" },
+                        { d: "M 0.05 1.08 L 0.05 0.02", stroke: "gray", stroke_w: ".004", fill: "none" }
+                    ];
+                for (var i = 0; i < static_paths.length; i++) {
+                    var path = document.createElementNS(svg_ns, "path");
+                    path.setAttribute("d", static_paths[i].d);
+                    path.setAttribute("stroke", static_paths[i].stroke);
+                    path.setAttribute("stroke-width", static_paths[i].stroke_w);
+                    path.setAttribute("fill", static_paths[i].fill);
+                    svg.appendChild(path);
+                }
+                var curve = document.createElementNS(svg_ns, "path"),
+                    path_d = "";
+                for (var i = 0; i < 21; i++)
+                    path_d += lineTo(curve_len, 1.);
+                curve.setAttribute("d", "M" + path_d.substring(1));
+                curve.setAttribute("stroke", "black");
+                curve.setAttribute("stroke-width", ".007");
+                curve.setAttribute("fill", "none");
+                var curve_gr = document.createElementNS(svg_ns, "g");
+                curve_gr.setAttribute("transform", "translate(0.05,0.05)");
+                curve_gr.appendChild(curve);
+                svg.appendChild(curve_gr);
+                var box = document.createElement('div');
+                box.id = dev_addr;
+                box.setAttribute("style", "width:100%;height:400px;");
+                box.appendChild(svg);
+                return box;
+            }
+
+            function update_graph(dev_addr, value) {
+                var curve_gr = document.querySelector("#" + dev_addr.replace(/\:/g, "\\:") + ">svg>g"),
+                    curve = curve_gr.firstChild,
+                    path_d = curve.getAttribute("d"),
+                    shift_idx = path_d.indexOf("L") + 1,
+                    xpos = curve_pos[dev_addr] += curve_step,
+                    next_point = lineTo(xpos + curve_len, 1. - value),
+                    translate = "translate(" + (0.05 - xpos).toFixed(3) + ",0.05)";
+                curve.setAttribute("d", "M" + path_d.substring(shift_idx) + next_point);
+                curve_gr.setAttribute("transform", translate);
+            }
+        </script>
+    </body>
+</html>
