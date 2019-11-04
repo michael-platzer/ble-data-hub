@@ -4,7 +4,7 @@ Wants=bluetooth.target
 After=bluetooth.target
 
 [Service]
-ExecStart=/bin/bash -c "rm -rf /var/lib/bluetooth/*; /home/pi/ble-data-hub/data-hub.py"
+ExecStart=/bin/bash -c "rm -rf /var/lib/bluetooth/*; /usr/bin/env python3 /home/pi/ble-data-hub/data-hub.py"
 
 [Install]
 WantedBy=multi-user.target
